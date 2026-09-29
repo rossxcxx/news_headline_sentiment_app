@@ -100,13 +100,9 @@ column names, rename them to match:
    with `st.cache_data` so re-running the app doesn't re-call the API on the
    same input. A **chat model** (`meta-llama/Llama-3.1-8B-Instruct` by
    default) powers the "Ask the Data" tab.
-4. **Offline fallback** — if you don't have a token yet, or hit a free-tier
-   rate limit, switch to "Offline (free demo, no API)" mode in the sidebar.
-   It uses a local lexicon-based classifier with zero API calls, so you can
-   still test the whole app end to end.
-5. **Visualize** — Plotly charts show sentiment distribution, sentiment by
+4. **Visualize** — Plotly charts show sentiment distribution, sentiment by
    category, sentiment trend over time, and top extracted keywords.
-6. **Ask the Data** — a chatbot tab feeds a summary + sample of the
+5. **Ask the Data** — a chatbot tab feeds a summary + sample of the
    currently filtered headlines to the model so you can ask free-form
    questions ("Which category gets the most coverage?").
 
