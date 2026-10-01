@@ -1,4 +1,4 @@
-# 📰 News Headline Sentiment & Trend Explorer
+# 📰 Newsflux
 
 Newsflux is a Streamlit web app that helps you understand the tone of the news. It ships with a dataset of news headlines that you can filter by category, author, and publication date, and browse as a stack of headline flashcards.
 
