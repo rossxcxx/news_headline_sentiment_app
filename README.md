@@ -1,8 +1,10 @@
 # 📰 News Headline Sentiment & Trend Explorer
 
-A GenAI-powered Streamlit app that analyzes news headlines for sentiment
-(tone), keywords/themes, and trends — with a built-in chatbot for asking
-questions about the dataset.
+Headlyn is a Streamlit web app that helps you understand the tone of the news. It ships with a dataset of news headlines that you can filter by category, author, and publication date, and browse as a stack of headline flashcards.
+
+After filtering, Headlyn sends a sample of headlines to a Hugging Face sentiment model, which labels each one as positive, negative, or neutral. Recurring keywords are extracted locally using word-frequency analysis. The results appear as interactive charts showing sentiment distribution, sentiment by category, sentiment over time, and the most common keywords.
+
+An "Ask the Data" chatbot lets you ask questions like "Which category gets the most coverage?" or "What negative themes show up most?" Counts and statistics are computed exactly in Python, and a language model explains them in plain language, so answers stay grounded in the data.
 
 
 ## 📊 Dataset source
