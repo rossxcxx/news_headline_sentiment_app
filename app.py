@@ -1,6 +1,6 @@
 """
-News Headline Sentiment & Trend Explorer
-A GenAI-powered Streamlit app for analyzing news headlines.
+Headlyn
+A GenAI-powered Streamlit app for reading the tone of the news.
 """
 
 import pandas as pd
@@ -15,10 +15,15 @@ from src.genai_analysis import (
 )
 
 st.set_page_config(
-    page_title="News Headline Sentiment Explorer",
+    page_title="Headlyn",
     page_icon="📰",
     layout="wide",
 )
+
+def _md_safe(text) -> str:
+    """Escape characters that Streamlit's markdown would otherwise interpret (e.g. $ as LaTeX)."""
+    return str(text).replace("$", "\\$")
+
 
 # Analysis always runs in GenAI (Hugging Face API) mode — the offline/demo
 # toggle has been removed from the UI, so this is fixed rather than user-chosen.
@@ -27,10 +32,10 @@ analysis_mode = "genai"
 # ---------------------------------------------------------------------------
 # Header
 # ---------------------------------------------------------------------------
-st.title("📰 News Headline Sentiment & Trend Explorer")
+st.title("📰 Headlyn")
 st.caption(
-    "Upload a dataset of news headlines, run GenAI-powered sentiment "
-    "(tone) analysis and keyword extraction, and explore trends interactively."
+    "Headline sentiment & trend explorer — run GenAI-powered sentiment "
+    "(tone) analysis and keyword extraction on news headlines, and explore trends interactively."
 )
 
 # ---------------------------------------------------------------------------
@@ -43,19 +48,14 @@ with st.container(border=True):
 
     with dataset_col:
         st.subheader("Dataset")
-        uploaded_file = st.file_uploader(
-            "Upload a CSV of news headlines", type=["csv"], help="Or leave empty to use the bundled sample dataset."
-        )
-
-        data_source = uploaded_file if uploaded_file is not None else default_path
 
         try:
-            df = load_data(data_source)
+            df = load_data(default_path)
         except Exception as e:
             st.error(f"Could not load dataset: {e}")
             st.stop()
 
-        st.success(f"Loaded {len(df):,} headlines.")
+        st.success(f"Loaded {len(df):,} headlines from the bundled dataset.")
 
     with filters_col:
         st.subheader("Filters")
@@ -186,12 +186,21 @@ st.divider()
 tab_overview, tab_viz = st.tabs(["📄 Data Preview", "📊 Visualizations"])
 
 with tab_overview:
-    st.subheader("Filtered Headline Sample")
-    with st.container(border=True):
-        st.dataframe(
-            filtered_df[["category", "headline", "short_description", "authors", "date"]].head(50),
-            use_container_width=True,
-        )
+    st.subheader("Headline Flashcards")
+    preview_df = filtered_df.head(50)
+    st.caption(f"Showing {len(preview_df):,} of {len(filtered_df):,} matching headlines — one card per line.")
+
+    if preview_df.empty:
+        st.info("No headlines match the current filters.")
+
+    for _, row in preview_df.iterrows():
+        with st.container(border=True):
+            date_txt = row["date"].strftime("%b %d, %Y") if pd.notna(row["date"]) else "No date"
+            st.caption(f"🏷️ {_md_safe(row['category'])}  ·  📅 {date_txt}")
+            st.markdown(f"#### {_md_safe(row['headline'])}")
+            if str(row["short_description"]).strip():
+                st.write(_md_safe(row["short_description"]))
+            st.caption(f"✍️ {_md_safe(row['authors'])}")
 
 with tab_viz:
     if st.session_state.analyzed_df is None:
@@ -252,6 +261,5 @@ with tab_viz:
 
 st.divider()
 st.caption(
-    "Built with Streamlit + Hugging Face for a GenAI dataset-analysis assignment. "
-    "Swap in your own news headlines CSV via the uploader above."
+    "Headlyn — built with Streamlit + Hugging Face for a GenAI dataset-analysis assignment."
 )
