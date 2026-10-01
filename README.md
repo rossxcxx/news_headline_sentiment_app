@@ -32,12 +32,6 @@ short description, author(s), date, and link metadata:
    currently filtered headlines to the model so you can ask free-form
    questions ("Which category gets the most coverage?").
 
-## Next Goals (per assignment)
+## Streamlit App Link
 
-- ✅ Filters by category and author are already included in the sidebar.
-- ✅ A basic "Ask the Data" chatbot tab is included.
-- Ideas to extend further:
-  - Add a category leaderboard ranking by average sentiment.
-  - Cache GenAI results to disk/DB so re-deploys don't re-analyze from scratch.
-  - Add support for OpenAI or Anthropic's Claude API as an alternative model provider.
-  - Add headline-length or engagement weighting to sentiment aggregation.
+https://newsheadlinesentimentapp-dmnejfmnnqxx3wpqsdebf2.streamlit.app
