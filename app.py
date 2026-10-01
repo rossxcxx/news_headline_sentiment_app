@@ -159,7 +159,9 @@ with st.sidebar:
     if ask_clicked and user_question.strip():
         with st.spinner("Thinking..."):
             try:
-                answer = answer_question_about_data(user_question, context_df, mode=chat_mode)
+                answer = answer_question_about_data(
+                    user_question, context_df, mode=chat_mode, full_df=filtered_df
+                )
             except GenAIUnavailableError as e:
                 st.error(str(e))
                 st.info(
