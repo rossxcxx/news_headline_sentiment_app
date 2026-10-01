@@ -1,8 +1,8 @@
 # 📰 News Headline Sentiment & Trend Explorer
 
-Headlyn is a Streamlit web app that helps you understand the tone of the news. It ships with a dataset of news headlines that you can filter by category, author, and publication date, and browse as a stack of headline flashcards.
+Newsflux is a Streamlit web app that helps you understand the tone of the news. It ships with a dataset of news headlines that you can filter by category, author, and publication date, and browse as a stack of headline flashcards.
 
-After filtering, Headlyn sends a sample of headlines to a Hugging Face sentiment model, which labels each one as positive, negative, or neutral. Recurring keywords are extracted locally using word-frequency analysis. The results appear as interactive charts showing sentiment distribution, sentiment by category, sentiment over time, and the most common keywords.
+After filtering, Newsflux sends a sample of headlines to a Hugging Face sentiment model, which labels each one as positive, negative, or neutral. Recurring keywords are extracted locally using word-frequency analysis. The results appear as interactive charts showing sentiment distribution, sentiment by category, sentiment over time, and the most common keywords.
 
 
 ## 📊 Dataset source
