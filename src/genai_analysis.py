@@ -108,44 +108,153 @@ def classify_sentiment_batch_genai(headlines: List[str]) -> List[Dict]:
     return results
 
 
-def answer_question_about_data_genai(question: str, df: pd.DataFrame) -> str:
-    """RAG-lite chatbot using a Hugging Face chat/instruct model."""
+def _top_keywords(df: pd.DataFrame, sentiment: str | None = None, n: int = 8) -> str:
+    """Return 'word (count), word (count)...' for the most common extracted keywords."""
+    if "keywords" not in df.columns:
+        return "N/A"
+    sub = df if sentiment is None else df[df["sentiment"] == sentiment]
+    kw = sub["keywords"].str.split(", ").explode().dropna()
+    kw = kw[kw != ""]
+    if kw.empty:
+        return "N/A"
+    return ", ".join(f"{w} ({c})" for w, c in kw.value_counts().head(n).items())
+
+
+def _build_chat_context(df: pd.DataFrame, full_df: pd.DataFrame | None = None) -> str:
+    """
+    Build an exact, pre-computed fact sheet for the chat model.
+
+    All counting is done here in pandas so the model only has to explain the
+    numbers, never compute them (LLMs are unreliable at counting).
+
+    df       : the analyzed sample (has sentiment/keywords) if analysis was run,
+               otherwise the filtered view.
+    full_df  : the full filtered view, used for category coverage.
+    """
+    coverage_df = full_df if full_df is not None else df
+    has_sentiment = "sentiment" in df.columns
+    lines = []
+
+    # --- Coverage (full filtered view) ---------------------------------
+    total_view = len(coverage_df)
+    lines.append(f"HEADLINES IN CURRENT FILTERED VIEW: {total_view}")
+    if coverage_df["date"].notna().any():
+        lines.append(
+            f"Date range: {coverage_df['date'].min().date()} to {coverage_df['date'].max().date()}"
+        )
+
+    cat_counts = coverage_df["category"].value_counts()
+    if not cat_counts.empty:
+        lines.append("\nNEWS CATEGORY COVERAGE (number of headlines per news category, most to least):")
+        for cat, n in cat_counts.head(10).items():
+            lines.append(f"- {cat}: {n} ({n / total_view:.0%})")
+        lines.append(f"Most covered news category: {cat_counts.index[0]} ({cat_counts.iloc[0]} headlines)")
+
+    # --- Sentiment (analyzed sample only) ------------------------------
+    if not has_sentiment:
+        lines.append(
+            "\nSENTIMENT: sentiment analysis has NOT been run yet, so there are no "
+            "sentiment results. If asked about sentiment, tell the user to click "
+            "'Run Sentiment Analysis' first."
+        )
+        sample = df.sample(min(25, len(df)), random_state=1)
+        sample_lines = [f"- [{r.category}] {r.headline}" for r in sample.itertuples()]
+    else:
+        n_an = len(df)
+        counts = df["sentiment"].value_counts()
+        pos, neg, neu = (int(counts.get(k, 0)) for k in ("positive", "negative", "neutral"))
+        lines.append(f"\nSENTIMENT RESULTS (analyzed sample of {n_an} headlines):")
+        lines.append(
+            f"- positive: {pos} ({pos / n_an:.0%}), negative: {neg} ({neg / n_an:.0%}), "
+            f"neutral: {neu} ({neu / n_an:.0%})"
+        )
+
+        by_cat = df.groupby(["category", "sentiment"]).size().unstack(fill_value=0)
+        for col in ("positive", "negative", "neutral"):
+            if col not in by_cat.columns:
+                by_cat[col] = 0
+        by_cat["total"] = by_cat[["positive", "negative", "neutral"]].sum(axis=1)
+        by_cat = by_cat.sort_values("total", ascending=False).head(8)
+        lines.append("\nSENTIMENT BY NEWS CATEGORY (analyzed sample):")
+        for cat, r in by_cat.iterrows():
+            lines.append(
+                f"- {cat}: {int(r['positive'])} positive, {int(r['negative'])} negative, "
+                f"{int(r['neutral'])} neutral"
+            )
+        if by_cat["negative"].max() > 0:
+            lines.append(
+                f"Category with the most negative headlines: {by_cat['negative'].idxmax()} "
+                f"({int(by_cat['negative'].max())})"
+            )
+
+        lines.append("\nTOP KEYWORDS (word frequency, with counts):")
+        lines.append(f"- overall: {_top_keywords(df)}")
+        lines.append(f"- in negative headlines: {_top_keywords(df, 'negative')}")
+        lines.append(f"- in positive headlines: {_top_keywords(df, 'positive')}")
+
+        if df["date"].notna().any():
+            t = df.dropna(subset=["date"]).copy()
+            t["month"] = t["date"].dt.to_period("M").astype(str)
+            tm = t.groupby(["month", "sentiment"]).size().unstack(fill_value=0).tail(6)
+            lines.append("\nRECENT MONTHLY SENTIMENT TREND (analyzed sample):")
+            for month, r in tm.iterrows():
+                lines.append(
+                    f"- {month}: " + ", ".join(f"{k} {int(r.get(k, 0))}" for k in ("positive", "negative", "neutral"))
+                )
+
+        parts = []
+        for label, k in (("negative", 12), ("positive", 8), ("neutral", 5)):
+            sub = df[df["sentiment"] == label]
+            parts.append(sub.sample(min(k, len(sub)), random_state=1))
+        sample = pd.concat(parts)
+        sample_lines = [f"- [{r.category} | {r.sentiment}] {r.headline}" for r in sample.itertuples()]
+
+    lines.append("\nEXAMPLE HEADLINES ([news category | sentiment] headline):")
+    lines.extend(sample_lines)
+    return "\n".join(lines)
+
+
+def answer_question_about_data_genai(
+    question: str, df: pd.DataFrame, full_df: pd.DataFrame | None = None
+) -> str:
+    """RAG-lite chatbot: answers from a pre-computed fact sheet using a HF chat model."""
     client = get_client(provider=CHAT_PROVIDER)
 
-    total = len(df)
-    pos = int((df.get("sentiment") == "positive").sum()) if "sentiment" in df else None
-    neg = int((df.get("sentiment") == "negative").sum()) if "sentiment" in df else None
-    sample_headlines = df["headline"].sample(min(25, total), random_state=1).tolist()
+    if len(df) == 0:
+        return "There are no headlines in the current view to analyze."
 
-    context = f"""
-Dataset summary:
-- Total headlines in current view: {total}
-- Positive: {pos if pos is not None else 'N/A'}
-- Negative: {neg if neg is not None else 'N/A'}
-
-Sample of up to 25 headlines from the current filtered view:
-{chr(10).join(f"- {h}" for h in sample_headlines)}
-""".strip()
+    context = _build_chat_context(df, full_df)
 
     messages = [
         {
             "role": "system",
             "content": (
-                "You are a helpful analyst answering questions about a news "
-                "headline dataset. Base your answer only on the summary and "
-                "sample headlines provided. Be concise and specific."
+                "You are a data analyst answering questions about a news headline "
+                "dataset. You are given a FACT SHEET with exact, pre-computed numbers.\n"
+                "Rules:\n"
+                "1. Use the numbers in the fact sheet exactly as written. Never count, "
+                "estimate or recalculate them yourself.\n"
+                "2. 'Category' means a NEWS category such as SPORTS or POLITICS. "
+                "Positive, negative and neutral are SENTIMENT labels, never categories.\n"
+                "3. For questions about themes, use the keyword lists and the example "
+                "headlines, and say which keywords or headlines support your answer.\n"
+                "4. If the fact sheet does not contain what is needed, say so plainly "
+                "instead of guessing.\n"
+                "5. Be concise: a short direct answer first, then brief supporting detail."
             ),
         },
-        {"role": "user", "content": f"{context}\n\nQuestion: {question}"},
+        {"role": "user", "content": f"FACT SHEET\n{context}\n\nQuestion: {question}"},
     ]
 
     try:
-        response = client.chat_completion(messages, model=CHAT_MODEL, max_tokens=400)
+        response = client.chat_completion(
+            messages, model=CHAT_MODEL, max_tokens=500, temperature=0.2
+        )
     except HfHubHTTPError as e:
         raise GenAIUnavailableError(
             "Hugging Face rejected the chat request. Check your token's "
-            "'Inference' permission, try again in a moment (free-tier rate "
-            f"limit), or switch to 'Offline (free demo)' mode. Details: {e}"
+            "'Inference' permission and try again in a moment (free-tier rate "
+            f"limit). Details: {e}"
         ) from e
     except Exception as e:
         raise GenAIUnavailableError(f"Hugging Face API error: {e}") from e
@@ -294,7 +403,12 @@ def classify_sentiment_batch(headlines: List[str], mode: str = "genai") -> List[
     return classify_sentiment_batch_genai(headlines)
 
 
-def answer_question_about_data(question: str, df: pd.DataFrame, mode: str = "genai") -> str:
+def answer_question_about_data(
+    question: str,
+    df: pd.DataFrame,
+    mode: str = "genai",
+    full_df: pd.DataFrame | None = None,
+) -> str:
     if mode == "offline":
         return answer_question_about_data_offline(question, df)
-    return answer_question_about_data_genai(question, df)
+    return answer_question_about_data_genai(question, df, full_df=full_df)
