@@ -1,5 +1,5 @@
 """
-Headlyn
+Newsflux
 A GenAI-powered Streamlit app for reading the tone of the news.
 """
 
@@ -15,7 +15,7 @@ from src.genai_analysis import (
 )
 
 st.set_page_config(
-    page_title="Headlyn",
+    page_title="Newsflux",
     page_icon="📰",
     layout="wide",
 )
@@ -32,7 +32,7 @@ analysis_mode = "genai"
 # ---------------------------------------------------------------------------
 # Header
 # ---------------------------------------------------------------------------
-st.title("📰 Headlyn")
+st.title("📰 Newsflux")
 st.caption(
     "Headline sentiment & trend explorer — run GenAI-powered sentiment "
     "(tone) analysis and keyword extraction on news headlines, and explore trends interactively."
@@ -263,5 +263,5 @@ with tab_viz:
 
 st.divider()
 st.caption(
-    "Headlyn — built with Streamlit + Hugging Face for a GenAI dataset-analysis assignment."
+    "Newsflux — built with Streamlit + Hugging Face for a GenAI dataset-analysis assignment."
 )
