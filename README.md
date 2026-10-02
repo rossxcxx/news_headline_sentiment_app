@@ -14,7 +14,7 @@ short description, author(s), date, and link metadata:
 - **Dataset page:** https://www.kaggle.com/datasets/rmisra/news-category-dataset
 
 
-## How it works
+## Features
 
 1. **Filter** — Widgets let you filter by category, author, and
    publication date range before running analysis (keeps things fast and
